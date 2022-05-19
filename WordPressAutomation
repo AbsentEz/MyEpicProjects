@@ -1,0 +1,92 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+
+  EFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: maxIO
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+        - TransitionToPrimaryStorageClass: AFTER_1_ACCESS
+      FileSystemTags:
+        - Key: EFS
+          Value: TestFileSystem
+          
+
+  RDS:
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      DBInstanceClass: db.t2.micro
+      Engine: mysql
+      MasterUsername: admin
+      MasterUserPassword: 123456789
+      AllocatedStorage: 20
+      BackupRetentionPeriod: 0
+      VPCSecurityGroups: 
+      - sg-0ff16ec3404857026
+      
+  MyEC2Instance: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      InstanceType: "t2.micro"
+      ImageId: "ami-0c1bc246476a5572b"
+      KeyName: "LabKeyPair"
+      UserData:
+          Fn::Base64: 
+            !Sub |
+              #!/bin/bash
+              cd /home/ec2-user
+              yum update -y
+              amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+              yum install -y httpd mariadb-server
+              systemctl start httpd
+              systemctl enable httpd
+              usermod -a -G apache ec2-user
+              chown -R ec2-user:apache /var/www
+              chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
+              find /var/www -type f -exec sudo chmod 0664 {} \;
+              systemctl start mariadb
+              systemctl enable mariadb
+              mysql_secure_installation <<EOF
+              
+              y
+              123456789
+              123456789
+              y
+              y
+              y
+              y
+              EOF
+              wget https://wordpress.org/latest.tar.gz
+              tar -xzf latest.tar.gz
+              mysql -u root -p123456789 -e "GRANT ALL PRIVILEGES ON *.* TO 'myuser'@'localhost' IDENTIFIED BY '123456789';FLUSH PRIVILEGES;" 
+              mysql -u root -p123456789 -e "CREATE DATABASE "mydatabase";"
+              cp wordpress/wp-config-sample.php wordpress/wp-config.php
+              sed -i -e "s/database_name_here/mydatabase/g" wordpress/wp-config.php
+              sed -i -e "s/password_here/123456789/g" wordpress/wp-config.php
+              sed -i -e "s/username_here/myuser/g" wordpress/wp-config.php
+              cp -r wordpress/* /var/www/html/
+              yum install php-gd -y
+
+      SecurityGroups:
+      - !Ref InstanceSecurityGroupForAutoScaling
+
+  InstanceSecurityGroupForAutoScaling:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable access to port 80,22 and 3306
+      GroupName: SecGrpAutoScale
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
