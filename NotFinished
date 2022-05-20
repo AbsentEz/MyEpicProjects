@@ -21,7 +21,7 @@ Resources:
               yum install php-gd -y
               yum install -y httpd 
               yum install amazon-efs-utils -y
-              mount -a -t efs $(EFS):/ /var/www/html _netdev
+              mount -a -t efs ${EFS}:/ /var/www/html _netdev
               systemctl start httpd
               systemctl enable httpd
               usermod -a -G apache ec2-user
@@ -34,7 +34,7 @@ Resources:
               sed -i -e "s/database_name_here/mydatabase/g" wordpress/wp-config.php
               sed -i -e "s/password_here/123456789/g" wordpress/wp-config.php
               sed -i -e "s/username_here/admin/g" wordpress/wp-config.php
-              sed -i -e "s/localhost/$(RDS.Endpoint.Address)/g" wordpress/wp-config.php
+              sed -i -e "s/localhost/${RDS.Endpoint.Address}/g" wordpress/wp-config.php
               cp -r wordpress/* /var/www/html/
 
       SecurityGroups:
@@ -58,7 +58,7 @@ Resources:
               yum install php-gd -y
               yum install -y httpd 
               yum install amazon-efs-utils -y
-              mount -a -t efs $(EFS):/ /var/www/html _netdev
+              mount -a -t efs ${EFS}:/ /var/www/html _netdev
               systemctl start httpd
               systemctl enable httpd
 
